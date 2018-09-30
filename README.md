@@ -1,0 +1,2 @@
+# ZippyShare
+Synology ZippyShare Plugin
