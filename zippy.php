@@ -1,6 +1,7 @@
 <?php
 	//Constants for debugging
-	//These are usually defined by the downloader
+	//These are usually defined by the downloader but we need them too for standalone debugging.
+	//The values of most constants actually matches what Synology would use as of Sept 2018
 	if (!defined('DOWNLOAD_STATION_USER_AGENT')) {
 		define('DOWNLOAD_STATION_USER_AGENT', 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/68.0.3440.106 Safari/537.36');
 	}
@@ -45,7 +46,8 @@
 	//Regex to check for the "file not found" text
 	define('REGEX_NOTFOUND','/>File does not exist on this server</i');
 	//The regex below gets the file name from the title.
-	//This sometimes failed in the past so we no longer use it
+	//This sometimes failed in the past so we no longer use it,
+	//but it's still here in case the other method fails and we need it.
 	//define('REGEX_FILENAME','/<title>ZippyShare.com - ([^<]+)<\/title>/i');
 	
 	class ZippyHost {
@@ -57,6 +59,7 @@
 		public function __construct($Url, $Username, $Password, $HostInfo) {
 			$this->Url = $Url;
 			//Since ZippyShare is free user mode only, we only care about the URL
+			//We still store the parameters for now
 			$this->Username = $Username;
 			$this->Password = $Password;
 			$this->HostInfo = $HostInfo;
@@ -146,27 +149,30 @@
 				}
 				else {
 					//Unable to load ZippyShare main page
-					$ret=array('err'=>ERR_TRY_IT_LATER,'debug'=>$zippy);
+					$ret=array('err'=>ERR_TRY_IT_LATER,'debug'=>NULL);
 				}
 			}
 			else {
 				//Unable to parse the URL as ZippyShare
-				$ret=array('err'=>ERR_INVALID_FILEHOST,'debug'=>$zippy);
+				$ret=array('err'=>ERR_INVALID_FILEHOST,'debug'=>NULL);
 			}
+			//Success
 			return $ret;
 		}
 	}
+	//Testing
 	if($argc>1 && $argv[1]==='test'){
-		//Example usage
+		//Example usage. You can trigger this with the command "php zippy.php test"
 		$x=new ZippyHost('https://www33.zippyshare.com/v/Wq0TFhYQ/file.html', NULL,NULL,NULL);
 		$data=$x->GetDownloadInfo();
 		if(isset($data[DOWNLOAD_ERROR])){
 			echo "Error: {$data[DOWNLOAD_ERROR]}";
+			//Log source during testing to debug errors
 			file_put_contents(__DIR__ . '/file.html',$data['DEBUG']);
 		}
 		else{
+			//unset debug entry since it's very large
 			unset($data['DEBUG']);
 			print_r($data);
 		}
 	}
-	
