@@ -85,6 +85,7 @@
 				return array(
 					DOWNLOAD_URL=>$data['url'],
 					DOWNLOAD_FILENAME=>$data['filename'],
+					//ZippyShare supports parallel downloads
 					DOWNLOAD_ISPARALLELDOWNLOAD=>TRUE
 				);
 			}
@@ -113,6 +114,7 @@
 					'method'=>'GET',
 					'header'=>
 						//HTTP Headers to make this request look more like it comes from a browser
+						//Note that the last header should end in \r\n too, this is no mistake
 						implode("\r\n",array(
 							'DNT: 1',
 							'User-Agent: ' . DOWNLOAD_STATION_USER_AGENT,
@@ -176,7 +178,7 @@
 	
 	//Testing
 	if(ZIPPY_ALLOW_DEBUG){
-		//You can trigger this with the command "php zippy.php test <url>"
+		//Run "php zippy.php test <url>" to obtain information
 		if($argc>2 && $argv[1]==='test'){
 			$x=new ZippyHost($argv[2], NULL,NULL,NULL);
 			$data=$x->GetDownloadInfo();
@@ -187,7 +189,7 @@
 				echo json_encode($data,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES);
 			}
 		}
-		//You can trigger this with the command "php zippy.php get <url>"
+		//Run "php zippy.php get <url>" to download the file
 		if($argc>2 && $argv[1]==='get'){
 			$x=new ZippyHost($argv[2], NULL,NULL,NULL);
 			if($x->DownloadFile()){
