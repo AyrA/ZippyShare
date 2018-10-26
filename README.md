@@ -35,6 +35,16 @@ Check [the Releases Section](https://github.com/AyrA/ZippyShare/releases) for th
 6. Click "Delete" and confirm action
 7. Select `zippy.host` from your Computer
 
+## Testing
+
+As of now, the download script will be placed in `/usr/syno/etc/packages/DownloadStation/download/userhosts/zippyshare`
+
+1. Enable SSH on your NAS
+2. Connect via SSH to your NAS
+3. navigate to `/usr/syno/etc/packages/DownloadStation/download/userhosts/zippyshare`
+4. Run `php zippy.php test https://...` (supply any valid URL)
+5. Run `wget https://...` (use the URL that was printed by running the previous command)
+
 ## Building from source
 
 You can either build it manually or automatically
