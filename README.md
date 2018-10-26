@@ -45,9 +45,14 @@ As of now, the download script will be placed in `/usr/syno/etc/packages/Downloa
 
 ### Getting Information
 
+This will display the same information that is relayed back to Download Station
+
 Run `php zippy.php test https://...` (supply any valid ZippyShare URL)
 
 ### Downloading File
+
+This is a "Debug only" Feature.
+The Download Station will use its own method of downloading files
 
 Run `php zippy.php get https://...` (supply any valid ZippyShare URL)
 
