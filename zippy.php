@@ -92,6 +92,19 @@
 			return array(DOWNLOAD_ERROR=>ERR_UNKNOWN);
 		}
 		
+		//Downloads a file using wget (for testing)
+		public function DownloadFile(){
+			$data = $this->GetDownloadInfo();
+			if(isset($data[DOWNLOAD_URL]) && isset($data[DOWNLOAD_FILENAME])){
+				$url=escapeshellarg($data[DOWNLOAD_URL]);
+				$fn=escapeshellarg($data[DOWNLOAD_FILENAME]);
+				echo "Executing: wget $url -O $fn\n";
+				exec("wget $url -O $fn");
+				return TRUE;
+			}
+			return FALSE;
+		}
+		
 		//Extracts file information from ZippyShare
 		private function getInfo($url){
 			$ret=FALSE;
@@ -172,6 +185,16 @@
 			}
 			else{
 				echo json_encode($data,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES);
+			}
+		}
+		//You can trigger this with the command "php zippy.php get <url>"
+		if($argc>2 && $argv[1]==='get'){
+			$x=new ZippyHost($argv[2], NULL,NULL,NULL);
+			if($x->DownloadFile()){
+				echo 'OK';
+			}
+			else{
+				echo 'Error downloading File';
 			}
 		}
 	}
