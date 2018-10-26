@@ -37,6 +37,8 @@
 		define('USER_IS_FREE',5);
 	}
 	
+	//Debug features. Set to TRUE to allow running this from console
+	define('ZIPPY_ALLOW_DEBUG',TRUE);
 	//Regex to capture the initial file URL
 	define('REGEX_URL','/(www\d+).zippyshare.com\/v\/([^\/]+)\/file.html/i');
 	//Regex to extract the file name from JS source code
@@ -77,19 +79,19 @@
 			if($data){
 				//Return error code if it was set
 				if(isset($data['err'])){
-					return array(DOWNLOAD_ERROR=>$data['err'],'DEBUG'=>$data['debug']);
+					return array(DOWNLOAD_ERROR=>$data['err']);
 				}
 				//Return reformatted data structure for downloader
 				return array(
 					DOWNLOAD_URL=>$data['url'],
 					DOWNLOAD_FILENAME=>$data['filename'],
-					DOWNLOAD_ISPARALLELDOWNLOAD=>TRUE,
-					'DEBUG'=>$data['debug']
+					DOWNLOAD_ISPARALLELDOWNLOAD=>TRUE
 				);
 			}
 			//unknown error
 			return array(DOWNLOAD_ERROR=>ERR_UNKNOWN);
 		}
+		
 		//Extracts file information from ZippyShare
 		private function getInfo($url){
 			$ret=FALSE;
@@ -106,14 +108,12 @@
 						)) . "\r\n"
 				)
 			);
-
 			//Check URL before even attempting to connect
 			if(preg_match(REGEX_URL,$url,$matches)){
 				$ctx=stream_context_create($opts);
 				$zippy=file_get_contents($url,FALSE,$ctx);
 				$segments=null;
 				if($zippy){
-					$ret['debug']=$zippy;
 					$server=$matches[1];
 					$id=$matches[2];
 					//Extract file name
@@ -133,46 +133,45 @@
 						else {
 							if(preg_match(REGEX_NOTFOUND,$zippy)){
 								//File not found
-								$ret=array('err'=>ERR_FILE_NO_EXIST,'debug'=>$zippy);							
+								$ret=array('err'=>ERR_FILE_NO_EXIST);							
 							}
 							else{
 								//This type of challenge is not supported
-								$ret=array('err'=>ERR_NOT_SUPPORT_TYPE,'debug'=>$zippy);							
+								$ret=array('err'=>ERR_NOT_SUPPORT_TYPE);							
 							}
 						}
 					}
 					else {
 						//Unable to extract filename even though we should be able to
 						//This is a sign of a missing file
-						$ret=array('err'=>ERR_FILE_NO_EXIST,'debug'=>$zippy);
+						$ret=array('err'=>ERR_FILE_NO_EXIST);
 					}
 				}
 				else {
 					//Unable to load ZippyShare main page
-					$ret=array('err'=>ERR_TRY_IT_LATER,'debug'=>NULL);
+					$ret=array('err'=>ERR_TRY_IT_LATER);
 				}
 			}
 			else {
 				//Unable to parse the URL as ZippyShare
-				$ret=array('err'=>ERR_INVALID_FILEHOST,'debug'=>NULL);
+				$ret=array('err'=>ERR_INVALID_FILEHOST);
 			}
 			//Success
 			return $ret;
 		}
 	}
+	
 	//Testing
-	if($argc>1 && $argv[1]==='test'){
-		//Example usage. You can trigger this with the command "php zippy.php test"
-		$x=new ZippyHost('https://www33.zippyshare.com/v/Wq0TFhYQ/file.html', NULL,NULL,NULL);
-		$data=$x->GetDownloadInfo();
-		if(isset($data[DOWNLOAD_ERROR])){
-			echo "Error: {$data[DOWNLOAD_ERROR]}";
-			//Log source during testing to debug errors
-			file_put_contents(__DIR__ . '/file.html',$data['DEBUG']);
-		}
-		else{
-			//unset debug entry since it's very large
-			unset($data['DEBUG']);
-			print_r($data);
+	if(ZIPPY_ALLOW_DEBUG){
+		//You can trigger this with the command "php zippy.php test <url>"
+		if($argc>2 && $argv[1]==='test'){
+			$x=new ZippyHost($argv[2], NULL,NULL,NULL);
+			$data=$x->GetDownloadInfo();
+			if(isset($data[DOWNLOAD_ERROR])){
+				echo "Error: {$data[DOWNLOAD_ERROR]}";
+			}
+			else{
+				echo json_encode($data,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES);
+			}
 		}
 	}
