@@ -150,8 +150,6 @@
 		die('Invalid URL');
 	}
 	
-	$result=getFullUrl('https://www27.zippyshare.com/v/0rvw38E1/file.html');
-	
-	
-	print_r($result);
+	//$result=getFullUrl('https://www27.zippyshare.com/v/0rvw38E1/file.html');
+	//print_r($result);
 	
