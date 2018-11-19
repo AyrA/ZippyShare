@@ -75,7 +75,12 @@
 		
 		//Called by the downloader to get the download information
 		public function GetDownloadInfo() {
-			$data=$this->getInfo($this->Url);
+			//prefer new info method
+			$data=$this->getNewInfo($this->Url);
+			if(isset($data['err'])){
+				$data=$this->getInfo($this->Url);
+			}
+			
 			if($data){
 				//Return error code if it was set
 				if(isset($data['err'])){
@@ -105,6 +110,190 @@
 			}
 			return FALSE;
 		}
+		
+		//Safely calculates a value
+		private function doCalc($a,$symbol,$b){
+			switch($symbol){
+				case '+':
+					return $a+$b;
+				case '-':
+					return $a-$b;
+				case '*':
+					return $a*$b;
+				case '/':
+					return $a/$b;
+				case '%':
+					return $a%$b;
+			}
+			return FALSE;
+		}
+		
+		private function getNewUrl($data){
+			$func=array();
+			$regex=array(
+				//class attribute
+				'CLASS'       =>'#class="(\d+)"#',
+				//constant function
+				'CONST'       =>'#var\s*(\w+)\s*=\s*function\s*\(\)\s*{\s*return\s*(\d+)\s*;?\s*}#',
+				//function with dependency
+				'JS_FUNC'     =>'#var\s*(\w+)\s*=\s*function\s*\(\)\s*{\s*return\s*(\w+)\(\)\s*(.)\s*(\d+)\s*;?\s*}#',
+				//variable that holds class attribute value
+				'CLASS_RESULT'=>'#var\s*(\w+)\s*=\s*document\.getElementById\([\'"]\w+[\'"]\)\.getAttribute\([\'"]class[\'"]\);?#',
+				//inline constant calculation
+				'INLINE_CALC' =>'#if\s*\(\s*true\s*\)\s*{\s*(\w+)\s*=\s*(\w+)\s*(.)\s*(\d+)\s*;?\s*}#',
+				//challenge calculation
+				'CHALLENGE'   =>'#\((\d+)\s*(.)\s*(\d+)\s*(.)\s*(\w+)\(?\)?\s*(.)\s*(\w+)\(?\)?\s*(.)\s*(\w+)\(?\)?\s*(.)\s*(\w+)\(?\)?\s*(.)\s*(\d+)(.)(\d+)\)#',
+				//file ID part (could also be extracted from URL since the first part is always /d/ as of now
+				'FILE_ID'     =>'#(/\w+/\w+/)"#',
+				//file name (doesn't uses title attribute which sometimes is missing)
+				'FILE_NAME'   =>'#"(/[^+]+)"\s*;#'
+				);
+		
+			//Get the value stored in the class attribute. There is only one class with just digits
+			if(preg_match($regex['CLASS'],$data,$matches)){
+				$func['class']=+$matches[1];
+			}
+			else{
+				return 'Unable to extract class attribute';
+			}
+			
+			//Get functions that return a constant
+			if(preg_match_all($regex['CONST'],$data,$matches))
+			{
+				for($i=0;$i<count($matches[0]);$i++){
+					$func[$matches[1][$i]]=+$matches[2][$i];
+				}
+			}
+			else{
+				return 'No individual JS functions found';
+			}
+			
+			//Get functions that return the result of another function
+			if(preg_match_all($regex['JS_FUNC'],$data,$matches))
+			{
+				for($i=0;$i<count($matches[0]);$i++){
+					$result=$this->doCalc(+$func[$matches[2][$i]],$matches[3][$i],+$matches[4][$i]);
+					if($result===FALSE){
+						return 'Invalid Operator in JS function: ' . $matches[3][$i];
+					}
+					$func[$matches[1][$i]]=$result;
+				}
+			}
+			else{
+				return 'No combined JS functions found';
+			}
+			
+			//Get variable that holds the class value
+			if(preg_match_all($regex['CLASS_RESULT'],$data,$matches)){
+				for($i=0;$i<count($matches[0]);$i++){
+					$func[$matches[1][$i]]=+$func['class'];
+				}
+			}
+			else{
+				return 'Unable to find inline class calculation';
+			}
+			
+			//Get inline calculation
+			if(preg_match_all($regex['INLINE_CALC'],$data,$matches)){
+				for($i=0;$i<count($matches[0]);$i++){
+					$result=$this->doCalc(+$func[$matches[2][$i]],$matches[3][$i],+$matches[4][$i]);
+					if($result===FALSE){
+						return 'Invalid Operator in inline function: ' . $matches[3][$i];
+					}
+					$func[$matches[1][$i]]=+$result;
+				}
+			}
+			else{
+				return 'Unable to find inline calculation';
+			}
+			
+			//Calculate number
+			if(preg_match($regex['CHALLENGE'],$data,$matches)){
+				//Mod challenge
+				$result=$this->doCalc(+$matches[1],$matches[2],+$matches[3]);
+				//a
+				$result=$this->doCalc($result,$matches[4],+$func[$matches[5]]);
+				//b
+				$result=$this->doCalc($result,$matches[6],+$func[$matches[7]]);
+				//c
+				$result=$this->doCalc($result,$matches[8],+$func[$matches[9]]);
+				//d
+				$result=$this->doCalc($result,$matches[10],+$func[$matches[11]]);
+				//const
+				$result=$this->doCalc($result,$matches[12],$this->doCalc(+$matches[13],$matches[14],+$matches[15]));
+				
+				$func['result']=$result;
+			}
+			
+			//Get Id
+			if(preg_match($regex['FILE_ID'],$data,$matches)){
+				$func['file_id']=$matches[1];
+			}
+			else{
+				return 'Unable to extract Id';
+			}
+			//Get File name
+			if(preg_match($regex['FILE_NAME'],$data,$matches)){
+				$func['file_name']=$matches[1];
+			}
+			else{
+				return 'Unable to extract Id';
+			}
+			
+			//Build url
+			$func['file_path']=$func['file_id'] . $func['result'] . $func['file_name'];
+			return $func;
+		}
+		
+		//Extracts file information from ZippyShare using their new mod challenge
+		private function getNewInfo($url){
+			$ret=FALSE;
+			$opts = array(
+				'http'=>array(
+					'method'=>'GET',
+					'header'=>
+						//HTTP Headers to make this request look more like it comes from a browser
+						//Note that the last header should end in \r\n too, this is no mistake
+						implode("\r\n",array(
+							'DNT: 1',
+							'User-Agent: ' . DOWNLOAD_STATION_USER_AGENT,
+							'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+							'Accept-Language: en-US,en;q=0.9,de;q=0.8'
+						)) . "\r\n"
+				)
+			);
+			//Check URL before even attempting to connect
+			if(preg_match(REGEX_URL,$url,$matches)){
+				$ctx=stream_context_create($opts);
+				$zippy=file_get_contents($url,FALSE,$ctx);
+				$segments=null;
+				if($zippy){
+					$data=$this->getNewUrl($zippy);
+					if(is_array($data)){
+						$data['file_url']='https://' . $matches[1] . '.zippyshare.com' . $data['file_path'];
+						$ret=array(
+							'filename'=>substr($data['file_name'],1),
+							'url'=>$data['file_url']
+						);
+					}
+					else {
+						//Unable to extract filename even though we should be able to
+						//This is a sign of a missing file
+						$ret=array('err'=>ERR_NOT_SUPPORTED_TYPE,'message'=>$data);
+					}
+				}
+				else {
+					//Unable to load ZippyShare main page
+					$ret=array('err'=>ERR_TRY_IT_LATER);
+				}
+			}
+			else {
+				//Unable to parse the URL as ZippyShare
+				$ret=array('err'=>ERR_INVALID_FILEHOST);
+			}
+			//Success
+			return $ret;		}
+		
 		
 		//Extracts file information from ZippyShare
 		private function getInfo($url){
