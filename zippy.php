@@ -36,7 +36,7 @@
 	if(!defined('USER_IS_FREE')){
 		define('USER_IS_FREE',5);
 	}
-	
+
 	//Debug features. Set to TRUE to allow running this from console
 	define('ZIPPY_ALLOW_DEBUG',TRUE);
 	//Regex to capture the initial file URL
@@ -51,13 +51,13 @@
 	//This sometimes failed in the past so we no longer use it,
 	//but it's still here in case the other method fails and we need it.
 	//define('REGEX_FILENAME','/<title>ZippyShare.com - ([^<]+)<\/title>/i');
-	
+
 	class ZippyHost {
 		private $Url;
 		private $Username;
 		private $Password;
 		private $HostInfo;
-		
+
 		public function __construct($Url, $Username, $Password, $HostInfo) {
 			$this->Url = $Url;
 			//Since ZippyShare is free user mode only, we only care about the URL
@@ -66,13 +66,13 @@
 			$this->Password = $Password;
 			$this->HostInfo = $HostInfo;
 		}
-		
+
 		//Verifies the current user.
 		//This is hardcoded to a free account and will never delete the cookie since we don't need one.
 		public function Verify($ClearCookie){
 			return USER_IS_FREE;
 		}
-		
+
 		//Called by the downloader to get the download information
 		public function GetDownloadInfo() {
 			//prefer new info method
@@ -80,7 +80,7 @@
 			if(isset($data['err'])){
 				$data=$this->getInfo($this->Url);
 			}
-			
+
 			if($data){
 				//Return error code if it was set
 				if(isset($data['err'])){
@@ -97,7 +97,7 @@
 			//unknown error
 			return array(DOWNLOAD_ERROR=>ERR_UNKNOWN);
 		}
-		
+
 		//Downloads a file using wget (for testing)
 		public function DownloadFile($overwrite){
 			$data = $this->GetDownloadInfo();
@@ -115,7 +115,7 @@
 			}
 			return FALSE;
 		}
-		
+
 		//Safely calculates a value
 		private function doCalc($a,$symbol,$b){
 			switch($symbol){
@@ -132,7 +132,7 @@
 			}
 			return FALSE;
 		}
-		
+
 		private function getNewUrl($data){
 			$func=array();
 			$regex=array(
@@ -153,7 +153,7 @@
 				//file name (doesn't uses title attribute which sometimes is missing)
 				'FILE_NAME'   =>'#"(/[^+]+)"\s*;#'
 				);
-		
+
 			//Get the value stored in the class attribute. There is only one class with just digits
 			if(preg_match($regex['CLASS'],$data,$matches)){
 				$func['class']=+$matches[1];
@@ -161,7 +161,7 @@
 			else{
 				return 'Unable to extract class attribute';
 			}
-			
+
 			//Get functions that return a constant
 			if(preg_match_all($regex['CONST'],$data,$matches))
 			{
@@ -172,7 +172,7 @@
 			else{
 				return 'No individual JS functions found';
 			}
-			
+
 			//Get functions that return the result of another function
 			if(preg_match_all($regex['JS_FUNC'],$data,$matches))
 			{
@@ -187,7 +187,7 @@
 			else{
 				return 'No combined JS functions found';
 			}
-			
+
 			//Get variable that holds the class value
 			if(preg_match_all($regex['CLASS_RESULT'],$data,$matches)){
 				for($i=0;$i<count($matches[0]);$i++){
@@ -197,7 +197,7 @@
 			else{
 				return 'Unable to find inline class calculation';
 			}
-			
+
 			//Get inline calculation
 			if(preg_match_all($regex['INLINE_CALC'],$data,$matches)){
 				for($i=0;$i<count($matches[0]);$i++){
@@ -211,7 +211,7 @@
 			else{
 				return 'Unable to find inline calculation';
 			}
-			
+
 			//Calculate number
 			if(preg_match($regex['CHALLENGE'],$data,$matches)){
 				//Mod challenge
@@ -226,10 +226,10 @@
 				$result=$this->doCalc($result,$matches[10],+$func[$matches[11]]);
 				//const
 				$result=$this->doCalc($result,$matches[12],$this->doCalc(+$matches[13],$matches[14],+$matches[15]));
-				
+
 				$func['result']=$result;
 			}
-			
+
 			//Get Id
 			if(preg_match($regex['FILE_ID'],$data,$matches)){
 				$func['file_id']=$matches[1];
@@ -244,12 +244,12 @@
 			else{
 				return 'Unable to extract Id';
 			}
-			
+
 			//Build url
 			$func['file_path']=$func['file_id'] . $func['result'] . $func['file_name'];
 			return $func;
 		}
-		
+
 		//Extracts file information from ZippyShare using their new mod challenge
 		private function getNewInfo($url){
 			$ret=FALSE;
@@ -298,8 +298,8 @@
 			}
 			//Success
 			return $ret;		}
-		
-		
+
+
 		//Extracts file information from ZippyShare
 		private function getInfo($url){
 			$ret=FALSE;
@@ -342,11 +342,11 @@
 						else {
 							if(preg_match(REGEX_NOTFOUND,$zippy)){
 								//File not found
-								$ret=array('err'=>ERR_FILE_NO_EXIST);							
+								$ret=array('err'=>ERR_FILE_NO_EXIST);
 							}
 							else{
 								//This type of challenge is not supported
-								$ret=array('err'=>ERR_NOT_SUPPORT_TYPE);							
+								$ret=array('err'=>ERR_NOT_SUPPORT_TYPE);
 							}
 						}
 					}
@@ -369,15 +369,16 @@
 			return $ret;
 		}
 	}
-	
-	//Make sure the arguments are present (even if empty), because they are not there if register_argc_argv isn't enabled
-	if(!isset($argc) || !isset($argv)){
-		$argc=0;
-		$argv=array();
-	}
-	
+
 	//Testing
 	if(ZIPPY_ALLOW_DEBUG){
+
+		//Make sure the arguments are present (even if empty), because they are not there if register_argc_argv isn't enabled
+		if(!isset($argc) || !isset($argv)){
+			$argc=0;
+			$argv=array();
+		}
+
 		//Run "php zippy.php info <url>" to obtain information
 		if($argc>2 && $argv[1]==='info'){
 			$x=new ZippyHost($argv[2], NULL,NULL,NULL);
