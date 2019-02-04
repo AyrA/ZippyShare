@@ -109,7 +109,7 @@
 					exec("wget $url -O $fn");
 				}
 				else{
-					echo "Skipping over existing file: $fn\n";
+					echo 'Skipping over existing file: ' . $data[DOWNLOAD_FILENAME] . "\n";
 				}
 				return TRUE;
 			}
