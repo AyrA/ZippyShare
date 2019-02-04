@@ -78,6 +78,7 @@
 			//prefer new info method
 			$data=$this->getNewInfo($this->Url);
 			if(isset($data['err'])){
+				//Try old info method
 				$data=$this->getInfo($this->Url);
 			}
 
@@ -250,10 +251,8 @@
 			return $func;
 		}
 
-		//Extracts file information from ZippyShare using their new mod challenge
-		private function getNewInfo($url){
-			$ret=FALSE;
-			$opts = array(
+		private function getContextOptions(){
+			return array(
 				'http'=>array(
 					'method'=>'GET',
 					'header'=>
@@ -267,6 +266,12 @@
 						)) . "\r\n"
 				)
 			);
+		}
+
+		//Extracts file information from ZippyShare using their new mod challenge
+		private function getNewInfo($url){
+			$ret=FALSE;
+			$opts = $this->getContextOptions();
 			//Check URL before even attempting to connect
 			if(preg_match(REGEX_URL,$url,$matches)){
 				$ctx=stream_context_create($opts);
@@ -303,20 +308,7 @@
 		//Extracts file information from ZippyShare
 		private function getInfo($url){
 			$ret=FALSE;
-			$opts = array(
-				'http'=>array(
-					'method'=>'GET',
-					'header'=>
-						//HTTP Headers to make this request look more like it comes from a browser
-						//Note that the last header should end in \r\n too, this is no mistake
-						implode("\r\n",array(
-							'DNT: 1',
-							'User-Agent: ' . DOWNLOAD_STATION_USER_AGENT,
-							'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-							'Accept-Language: en-US,en;q=0.9,de;q=0.8'
-						)) . "\r\n"
-				)
-			);
+			$opts = $this->getContextOptions();
 			//Check URL before even attempting to connect
 			if(preg_match(REGEX_URL,$url,$matches)){
 				$ctx=stream_context_create($opts);
