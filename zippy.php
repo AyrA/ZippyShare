@@ -40,17 +40,17 @@
 	//Debug features. Set to TRUE to allow running this from console
 	define('ZIPPY_ALLOW_DEBUG',TRUE);
 	//Regex to capture the initial file URL
-	define('REGEX_URL','/(www\d+).zippyshare.com\/v\/([^\/]+)\/file.html/i');
+	define('REGEX_URL','#(www\d+).zippyshare.com/v/([^/]+)/file.html#i');
 	//Regex to extract the file name from JS source code
-	define('REGEX_FILENAME','/[^=]"\/([^?<\/"]+)"/i');
+	define('REGEX_FILENAME','#[^=]"/([^?</"]+)"#i');
 	//Regex to extract the mod challenge
-	define('REGEX_MOD','/\((-?\d+)\s*%\s*(-?\d+)\s*\+\s*(-?\d+)\s*%\s*(-?\d+)\)/');
+	define('REGEX_MOD','#\((-?\d+)\s*%\s*(-?\d+)\s*\+\s*(-?\d+)\s*%\s*(-?\d+)\)#');
 	//Regex to check for the "file not found" text
-	define('REGEX_NOTFOUND','/>File does not exist on this server</i');
+	define('REGEX_NOTFOUND','#>File does not exist on this server<#i');
 	//The regex below gets the file name from the title.
 	//This sometimes failed in the past so we no longer use it,
 	//but it's still here in case the other method fails and we need it.
-	//define('REGEX_FILENAME','/<title>ZippyShare.com - ([^<]+)<\/title>/i');
+	//define('REGEX_FILENAME','#<title>ZippyShare.com - ([^<]+)#i');
 
 	class ZippyHost {
 		private $Url;
