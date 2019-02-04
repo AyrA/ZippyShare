@@ -99,13 +99,18 @@
 		}
 		
 		//Downloads a file using wget (for testing)
-		public function DownloadFile(){
+		public function DownloadFile($overwrite){
 			$data = $this->GetDownloadInfo();
 			if(isset($data[DOWNLOAD_URL]) && isset($data[DOWNLOAD_FILENAME])){
-				$url=escapeshellarg($data[DOWNLOAD_URL]);
-				$fn=escapeshellarg($data[DOWNLOAD_FILENAME]);
-				echo "Executing: wget $url -O $fn\n";
-				exec("wget $url -O $fn");
+				if($overwrite || !file_exists($data[DOWNLOAD_FILENAME])){
+					$url=escapeshellarg($data[DOWNLOAD_URL]);
+					$fn=escapeshellarg($data[DOWNLOAD_FILENAME]);
+					echo "Executing: wget $url -O $fn\n";
+					exec("wget $url -O $fn");
+				}
+				else{
+					echo "Skipping over existing file: $fn\n";
+				}
 				return TRUE;
 			}
 			return FALSE;
@@ -365,27 +370,33 @@
 		}
 	}
 	
+	//Make sure the arguments are present (even if empty), because they are not there if register_argc_argv isn't enabled
+	if(!isset($argc) || !isset($argv)){
+		$argc=0;
+		$argv=array();
+	}
+	
 	//Testing
 	if(ZIPPY_ALLOW_DEBUG){
-		//Run "php zippy.php test <url>" to obtain information
-		if($argc>2 && $argv[1]==='test'){
+		//Run "php zippy.php info <url>" to obtain information
+		if($argc>2 && $argv[1]==='info'){
 			$x=new ZippyHost($argv[2], NULL,NULL,NULL);
 			$data=$x->GetDownloadInfo();
 			if(isset($data[DOWNLOAD_ERROR])){
-				echo "Error: {$data[DOWNLOAD_ERROR]}";
+				echo "Error: {$data[DOWNLOAD_ERROR]}\n";
 			}
 			else{
-				echo json_encode($data,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES);
+				echo json_encode($data,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES) . "\n";
 			}
 		}
-		//Run "php zippy.php get <url>" to download the file
+		//Run "php zippy.php get <url> [-f]" to download the file
 		if($argc>2 && $argv[1]==='get'){
 			$x=new ZippyHost($argv[2], NULL,NULL,NULL);
-			if($x->DownloadFile()){
-				echo 'OK';
+			if($x->DownloadFile(in_array('-f',$argv))){
+				echo "OK\n";
 			}
 			else{
-				echo 'Error downloading File';
+				echo "Error downloading File\n";
 			}
 		}
 	}
