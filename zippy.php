@@ -39,6 +39,8 @@
 
 	//Debug features. Set to TRUE to allow running this from console
 	define('ZIPPY_ALLOW_DEBUG',TRUE);
+	//Set to TRUE to log function calls to /tmp/zippyerr
+	define('ZIPPY_PRINT_DEBUG',FALSE);
 	//Regex to capture the initial file URL
 	define('REGEX_URL','#(www\d+).zippyshare.com/v/([^/]+)/file.html#i');
 	//Regex to extract the file name from JS source code
@@ -59,6 +61,7 @@
 		private $HostInfo;
 
 		public function __construct($Url, $Username, $Password, $HostInfo) {
+			ZIPPY_PRINT_DEBUG && file_put_contents('/tmp/zippyerr',"__construct('$Url', ... , ... , ...)\n",FILE_APPEND);
 			$this->Url = $Url;
 			//Since ZippyShare is free user mode only, we only care about the URL
 			//We still store the parameters for now
@@ -70,16 +73,26 @@
 		//Verifies the current user.
 		//This is hardcoded to a free account and will never delete the cookie since we don't need one.
 		public function Verify($ClearCookie){
+			ZIPPY_PRINT_DEBUG && file_put_contents('/tmp/zippyerr',"Verify('$ClearCookie')\n",FILE_APPEND);
 			return USER_IS_FREE;
 		}
 
 		//Called by the downloader to get the download information
 		public function GetDownloadInfo() {
-			//prefer new info method
-			$data=$this->getNewInfo($this->Url);
-			if(isset($data['err'])){
-				//Try old info method
-				$data=$this->getInfo($this->Url);
+			ZIPPY_PRINT_DEBUG && file_put_contents('/tmp/zippyerr',"getDownloadInfo()\n",FILE_APPEND);
+			//prefer new info method over old ones
+			$data=NULL;
+			
+			if(preg_match(REGEX_URL,$this->Url)){
+				$zippy=$this->getHTML($this->Url);
+				$data=$this->getInfo3($this->Url,$zippy);
+				if(isset($data['err'])){
+					$data=$this->getInfo2($this->Url,$zippy);
+					if(isset($data['err'])){
+						//Try old info method
+						$data=$this->getInfo1($this->Url,$zippy);
+					}
+				}
 			}
 
 			if($data){
@@ -101,13 +114,24 @@
 
 		//Downloads a file using wget (for testing)
 		public function DownloadFile($overwrite){
+			ZIPPY_PRINT_DEBUG && file_put_contents('/tmp/zippyerr',"DownloadFile($overwrite)\n",FILE_APPEND);
 			$data = $this->GetDownloadInfo();
 			if(isset($data[DOWNLOAD_URL]) && isset($data[DOWNLOAD_FILENAME])){
 				if($overwrite || !file_exists($data[DOWNLOAD_FILENAME])){
-					$url=escapeshellarg($data[DOWNLOAD_URL]);
-					$fn=escapeshellarg($data[DOWNLOAD_FILENAME]);
-					echo "Executing: wget $url -O $fn\n";
-					exec("wget $url -O $fn");
+					echo 'Downloading ' . $data[DOWNLOAD_FILENAME] . "\n";
+					$fp=fopen($data[DOWNLOAD_FILENAME], 'wb+');
+					$ch=curl_init($data[DOWNLOAD_URL]);
+					curl_setopt($ch,CURLOPT_USERAGENT,DOWNLOAD_STATION_USER_AGENT);
+					curl_setopt($ch,CURLOPT_TIMEOUT,50);
+					curl_setopt($ch,CURLOPT_RETURNTRANSFER,TRUE);
+					curl_setopt($ch,CURLOPT_FILE,$fp); 
+					curl_exec($ch); 
+					curl_close($ch);
+					fclose($fp);
+					//$url=escapeshellarg($data[DOWNLOAD_URL]);
+					//$fn=escapeshellarg($data[DOWNLOAD_FILENAME]);
+					//echo "Executing: wget $url -O $fn\n";
+					//exec("wget $url -O $fn");
 				}
 				else{
 					echo 'Skipping over existing file: ' . $data[DOWNLOAD_FILENAME] . "\n";
@@ -119,6 +143,7 @@
 
 		//Safely calculates a value
 		private function doCalc($a,$symbol,$b){
+			ZIPPY_PRINT_DEBUG && file_put_contents('/tmp/zippyerr',"doCalc($a,'$symbol',$b)\n",FILE_APPEND);
 			switch($symbol){
 				case '+':
 					return $a+$b;
@@ -134,7 +159,9 @@
 			return FALSE;
 		}
 
+		//Extracts the URL from ZippyShare Source
 		private function getNewUrl($data){
+			ZIPPY_PRINT_DEBUG && file_put_contents('/tmp/zippyerr',"getNewUrl(data length: " . strlen($data) . ")\n",FILE_APPEND);
 			$func=array();
 			$regex=array(
 				//class attribute
@@ -251,36 +278,93 @@
 			return $func;
 		}
 
-		private function getContextOptions(){
-			return array(
-				'http'=>array(
-					'method'=>'GET',
-					'header'=>
-						//HTTP Headers to make this request look more like it comes from a browser
-						//Note that the last header should end in \r\n too, this is no mistake
-						implode("\r\n",array(
-							'DNT: 1',
-							'User-Agent: ' . DOWNLOAD_STATION_USER_AGENT,
-							'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-							'Accept-Language: en-US,en;q=0.9,de;q=0.8'
-						)) . "\r\n"
-				)
-			);
+		private function getHTML($url){
+			$ch=curl_init($url);
+			curl_setopt($ch,CURLOPT_USERAGENT,DOWNLOAD_STATION_USER_AGENT);
+			curl_setopt($ch,CURLOPT_RETURNTRANSFER,TRUE);
+			$zippy=curl_exec($ch); 
+			curl_close($ch);
+			return $zippy;
 		}
+		
+		private function getInfo3($url,$zippy){
+			ZIPPY_PRINT_DEBUG && file_put_contents('/tmp/zippyerr',"getInfo3('$url')\n",FILE_APPEND);
+			$regex='#var\s+a\s=\s(\d+);[^=]+=\s"[^"]+"\.substr\(\d+,\s(\d+)\);[^/]+/(\w+)/\w+/"\+\(Math\.pow\((\w+),\s(\w+)\)(.)(\w+)#';
+			
+			if(preg_match(REGEX_URL,$url,$matches)){
+				$server=$matches[1];
+				$id=$matches[2];
+				if(preg_match(REGEX_FILENAME,$zippy,$names))
+				{
+					$fname=$names[1];
+					if(preg_match($regex,$zippy,$segments)){
+						$a=+$segments[1];
+						$b=+$segments[2];
+						$url1=$segments[3];
+						$pow1=$segments[4];
+						$pow2=$segments[5];
+						$operator=$segments[6];
+						$operand=$segments[7];
 
+						if($pow1==='a'){
+							$pow1=$a;
+						}
+						elseif($pow1==='b'){
+							$pow1=$b;
+						}
+						else{
+							$pow1=+$pow1;
+						}
+						
+						if($pow2==='a'){
+							$pow2=$a;
+						}
+						elseif($pow2==='b'){
+							$pow2=$b;
+						}
+						else{
+							$pow2=+$pow2;
+						}
+						
+						if($operand==='a'){
+							$operand=$a;
+						}
+						elseif($operand==='b'){
+							$operand=$b;
+						}
+						else{
+							$operand=+$operand;
+						}
+						
+						$mod=$this->doCalc(pow($pow1,$pow2),$operator,$operand);
+						return array(
+							'url'=>"https://$server.zippyshare.com/$url1/$id/$mod/$fname",
+							'filename'=>$fname
+						);
+					}
+					else{
+						return array('err'=>ERR_NOT_SUPPORTED_TYPE,'message'=>$data);
+					}
+				}
+				else{
+					return array('err'=>ERR_NOT_SUPPORTED_TYPE,'message'=>$data);
+				}
+			}
+			return FALSE;
+		}
+		
 		//Extracts file information from ZippyShare using their new mod challenge
-		private function getNewInfo($url){
+		private function getInfo2($url,$zippy){
+			ZIPPY_PRINT_DEBUG && file_put_contents('/tmp/zippyerr',"getInfo2('$url')\n",FILE_APPEND);
 			$ret=FALSE;
-			$opts = $this->getContextOptions();
 			//Check URL before even attempting to connect
 			if(preg_match(REGEX_URL,$url,$matches)){
-				$ctx=stream_context_create($opts);
-				$zippy=file_get_contents($url,FALSE,$ctx);
-				$segments=null;
+				$server=$matches[1];
+				$id=$matches[2];
 				if($zippy){
 					$data=$this->getNewUrl($zippy);
 					if(is_array($data)){
-						$data['file_url']='https://' . $matches[1] . '.zippyshare.com' . $data['file_path'];
+						$data['file_url']="https://$server.zippyshare.com" . $data['file_path'];
 						$ret=array(
 							'filename'=>substr($data['file_name'],1),
 							'url'=>$data['file_url']
@@ -306,14 +390,11 @@
 
 
 		//Extracts file information from ZippyShare
-		private function getInfo($url){
+		private function getInfo1($url,$zippy){
+			ZIPPY_PRINT_DEBUG && file_put_contents('/tmp/zippyerr',"getInfo1('$url')\n",FILE_APPEND);
 			$ret=FALSE;
-			$opts = $this->getContextOptions();
 			//Check URL before even attempting to connect
 			if(preg_match(REGEX_URL,$url,$matches)){
-				$ctx=stream_context_create($opts);
-				$zippy=file_get_contents($url,FALSE,$ctx);
-				$segments=null;
 				if($zippy){
 					$server=$matches[1];
 					$id=$matches[2];
@@ -392,4 +473,8 @@
 				echo "Error downloading File\n";
 			}
 		}
+
 	}
+	ZIPPY_PRINT_DEBUG && file_put_contents('/tmp/zippyerr','PHP Version: ' . phpversion() . "\n",FILE_APPEND);
+	ZIPPY_PRINT_DEBUG && file_put_contents('/tmp/zippyerr','PHP Parsed: ' . time() . "\n",FILE_APPEND);
+?>
