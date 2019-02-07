@@ -57,6 +57,12 @@ The Download Station will use its own method of downloading files
 Run `php zippy.php get https://...` (supply any valid ZippyShare URL).
 To make the script overwrite existing files, add the `-f` argument at the end
 
+### Problematic URLs
+
+The script `zippy.js` from this repository can be used to validate URLs that refuse to work with the plugin.
+Call using `phantomjs zippy.js <url> -v`
+If it reports "Valid: No", it indicates that the formula was changed and the plugin needs adjustment.
+
 ## Building from source
 
 You can either build it manually or automatically
