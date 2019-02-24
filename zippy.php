@@ -85,12 +85,15 @@
 			
 			if(preg_match(REGEX_URL,$this->Url)){
 				$zippy=$this->getHTML($this->Url);
-				$data=$this->getInfo3($this->Url,$zippy);
+				$data=$this->getInfo4($this->Url,$zippy);
 				if(isset($data['err'])){
-					$data=$this->getInfo2($this->Url,$zippy);
+					$data=$this->getInfo3($this->Url,$zippy);
 					if(isset($data['err'])){
-						//Try old info method
-						$data=$this->getInfo1($this->Url,$zippy);
+						$data=$this->getInfo2($this->Url,$zippy);
+						if(isset($data['err'])){
+							//Try old info method
+							$data=$this->getInfo1($this->Url,$zippy);
+						}
 					}
 				}
 			}
@@ -285,6 +288,33 @@
 			$zippy=curl_exec($ch); 
 			curl_close($ch);
 			return $zippy;
+		}
+		
+		private function getInfo4($url,$zippy){
+			$regex='#var\s+a\s*=\s*(-?\d+);\s+var\s+b\s*=\s*(-?\d+);#';
+			if(preg_match(REGEX_URL,$url,$matches)){
+				$server=$matches[1];
+				$id=$matches[2];
+				if(preg_match(REGEX_FILENAME,$zippy,$names)){
+					$fname=$names[1];
+					if(preg_match($regex,$zippy,$segments)){
+						$a=+$segments[1];
+						$b=+$segments[2];
+						$mod=floor($a/3)+($a%$b);
+						return array(
+							'url'=>"https://$server.zippyshare.com/d/$id/$mod/$fname",
+							'filename'=>$fname
+						);
+					}
+					else{
+						return array('err'=>ERR_NOT_SUPPORTED_TYPE,'message'=>$data);
+					}
+				}
+				else{
+					return array('err'=>ERR_NOT_SUPPORTED_TYPE,'message'=>$data);
+				}
+			}
+			return FALSE;
 		}
 		
 		private function getInfo3($url,$zippy){
