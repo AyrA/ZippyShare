@@ -40,7 +40,7 @@
 	//Debug features. Set to TRUE to allow running this from console
 	define('ZIPPY_ALLOW_DEBUG',TRUE);
 	//Set to TRUE to log function calls to /tmp/zippyerr
-	define('ZIPPY_PRINT_DEBUG',TRUE);
+	define('ZIPPY_PRINT_DEBUG',FALSE);
 	//Regex to capture the initial file URL
 	define('REGEX_URL','#(www\d+).zippyshare.com/v/([^/]+)/file.html#i');
 	//Regex to extract the file name from JS source code
