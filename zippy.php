@@ -40,11 +40,12 @@
 	//Debug features. Set to TRUE to allow running this from console
 	define('ZIPPY_ALLOW_DEBUG',TRUE);
 	//Set to TRUE to log function calls to /tmp/zippyerr
-	define('ZIPPY_PRINT_DEBUG',FALSE);
+	define('ZIPPY_PRINT_DEBUG',TRUE);
 	//Regex to capture the initial file URL
 	define('REGEX_URL','#(www\d+).zippyshare.com/v/([^/]+)/file.html#i');
 	//Regex to extract the file name from JS source code
 	define('REGEX_FILENAME','#[^=]"/([^?</"]+)"#i');
+	define('REGEX_FILENAME_NEW','#title"\s+content="([^?</"]+)"#i');
 	//Regex to extract the mod challenge
 	define('REGEX_MOD','#\((-?\d+)\s*%\s*(-?\d+)\s*\+\s*(-?\d+)\s*%\s*(-?\d+)\)#');
 	//Regex to check for the "file not found" text
@@ -89,22 +90,26 @@
 			if(preg_match(REGEX_URL,$this->Url)){
 				$zippy=$this->getHTML($this->Url);
 				ZIPPY_PRINT_DEBUG && file_put_contents('/tmp/zippyerr',"getDownloadInfo(): " . strlen($zippy) . " bytes HTML\n",FILE_APPEND);
-				ZIPPY_PRINT_DEBUG && file_put_contents('/tmp/zippyerr',"getDownloadInfo(): Try version 5\n",FILE_APPEND);
-				$data=$this->getInfo5($this->Url,$zippy);
+				ZIPPY_PRINT_DEBUG && file_put_contents('/tmp/zippyerr',"getDownloadInfo(): Try version 6\n",FILE_APPEND);
+				$data=$this->getInfo6($this->Url,$zippy);
 				if(isset($data['err'])){
-					ZIPPY_PRINT_DEBUG && file_put_contents('/tmp/zippyerr',"getDownloadInfo(): Try version 4\n",FILE_APPEND);
-					$data=$this->getInfo4($this->Url,$zippy);
+					ZIPPY_PRINT_DEBUG && file_put_contents('/tmp/zippyerr',"getDownloadInfo(): Try version 5\n",FILE_APPEND);
+					$data=$this->getInfo5($this->Url,$zippy);
 					if(isset($data['err'])){
-						ZIPPY_PRINT_DEBUG && file_put_contents('/tmp/zippyerr',"getDownloadInfo(): Try version 3\n",FILE_APPEND);
-						$data=$this->getInfo3($this->Url,$zippy);
+						ZIPPY_PRINT_DEBUG && file_put_contents('/tmp/zippyerr',"getDownloadInfo(): Try version 4\n",FILE_APPEND);
+						$data=$this->getInfo4($this->Url,$zippy);
 						if(isset($data['err'])){
-							ZIPPY_PRINT_DEBUG && file_put_contents('/tmp/zippyerr',"getDownloadInfo(): Try version 2\n",FILE_APPEND);
-							$data=$this->getInfo2($this->Url,$zippy);
+							ZIPPY_PRINT_DEBUG && file_put_contents('/tmp/zippyerr',"getDownloadInfo(): Try version 3\n",FILE_APPEND);
+							$data=$this->getInfo3($this->Url,$zippy);
 							if(isset($data['err'])){
-								ZIPPY_PRINT_DEBUG && file_put_contents('/tmp/zippyerr',"getDownloadInfo(): Try version 1\n",FILE_APPEND);
-								$data=$this->getInfo1($this->Url,$zippy);
+								ZIPPY_PRINT_DEBUG && file_put_contents('/tmp/zippyerr',"getDownloadInfo(): Try version 2\n",FILE_APPEND);
+								$data=$this->getInfo2($this->Url,$zippy);
 								if(isset($data['err'])){
-									ZIPPY_PRINT_DEBUG && file_put_contents('/tmp/zippyerr',"getDownloadInfo(): All modes failed\n",FILE_APPEND);
+									ZIPPY_PRINT_DEBUG && file_put_contents('/tmp/zippyerr',"getDownloadInfo(): Try version 1\n",FILE_APPEND);
+									$data=$this->getInfo1($this->Url,$zippy);
+									if(isset($data['err'])){
+										ZIPPY_PRINT_DEBUG && file_put_contents('/tmp/zippyerr',"getDownloadInfo(): All modes failed\n",FILE_APPEND);
+									}
 								}
 							}
 						}
@@ -311,6 +316,44 @@
 			$zippy=curl_exec($ch);
 			curl_close($ch);
 			return $zippy;
+		}
+		
+		private function getInfo6($url,$zippy){
+			ZIPPY_PRINT_DEBUG && file_put_contents('/tmp/zippyerr',"getInfo6('$url')\n",FILE_APPEND);
+			$regex1='#var\s+(\w+)\s?=\s?(-?[\d.]+)\s*;\s*var\s+(\w+)\s?=\s?(-?[\d.]+)\s*;#';
+			$regex2='#(\w+\s*[+\-*/]\s*\w+\s*[+\-*/]\s*\w+\s*[+\-*/]\s*\w+)\s*\)\s*\+\s*"(\d+)#';
+			if(preg_match(REGEX_URL,$url,$matches)){
+				$server=$matches[1];
+				$id=$matches[2];
+				if(preg_match(REGEX_FILENAME_NEW,$zippy,$names)){
+					$fname=trim($names[1]);
+					ZIPPY_PRINT_DEBUG && file_put_contents('/tmp/zippyerr',"getInfo3(): server=$server;id=$id;file=$fname\n",FILE_APPEND);
+					if(preg_match($regex1,$zippy,$segments)){
+						//Extract the two variables
+						$var1=$segments[1];
+						$val1=+$segments[2];
+						$var2=$segments[3];
+						$val2=+$segments[4];
+						//Extract the calculation
+						if(preg_match($regex2,$zippy,$segments)){
+							$calc=str_replace($var1,$val1,$segments[1]);
+							$calc=str_replace($var2,$val2,$calc);
+							//Eval is usually not safe, but our regex doesn't allows parenthesis,
+							//which should avoid calling of functions by malicious code.
+							ZIPPY_PRINT_DEBUG && file_put_contents('/tmp/zippyerr',"getInfo5('$url') calculation: $calc\n",FILE_APPEND);
+							$calc=eval("return $calc;") . $segments[2];
+							return array(
+								'url'=>"https://$server.zippyshare.com/d/$id/$calc/$fname",
+								'filename'=>$fname
+							);
+						}
+						return array('err'=>ERR_NOT_SUPPORT_TYPE,'message'=>'Unable to decode calculation');
+					}
+					return array('err'=>ERR_NOT_SUPPORT_TYPE,'message'=>'Unable to decode variable names and values');
+				}
+				return array('err'=>ERR_NOT_SUPPORT_TYPE,'message'=>'Can\'t decode file name');
+			}
+			return FALSE;
 		}
 
 		private function getInfo5($url,$zippy){
