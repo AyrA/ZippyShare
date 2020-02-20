@@ -169,6 +169,23 @@
 			return FALSE;
 		}
 
+		//A more robust way to extract the file name
+		private function getFileName($zippy){
+			$regexURL='#dlbutton[\'"]\).href[^;]+"([^"]+)";#';
+			if(preg_match(REGEX_FILENAME_NEW,$zippy,$names)){
+				$name=trim($names[1]);
+				if(strtolower($name)!=='private file'){
+					return $name;
+				}
+			}
+			if(preg_match($regexURL,$zippy,$names)){
+				if(preg_match('#[^/]+$#',$names[1],$filename)){
+					return trim($filename[0]);
+				}
+			}
+			return NULL;
+		}
+
 		//Safely calculates a value
 		private function doCalc($a,$symbol,$b){
 			ZIPPY_PRINT_DEBUG && file_put_contents('/tmp/zippyerr',"doCalc($a,'$symbol',$b)\n",FILE_APPEND);
@@ -325,8 +342,7 @@
 			if(preg_match(REGEX_URL,$url,$matches)){
 				$server=$matches[1];
 				$id=$matches[2];
-				if(preg_match(REGEX_FILENAME_NEW,$zippy,$names)){
-					$fname=trim($names[1]);
+				if($fname=$this->getFileName($zippy)){
 					ZIPPY_PRINT_DEBUG && file_put_contents('/tmp/zippyerr',"getInfo3(): server=$server;id=$id;file=$fname\n",FILE_APPEND);
 					if(preg_match($regex1,$zippy,$segments)){
 						//Extract the two variables
