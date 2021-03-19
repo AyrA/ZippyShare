@@ -2,7 +2,7 @@
 	"name": "zippyshare",
 	"hostprefix": "zippyshare.com",
 	"displayname": "ZippyShare",
-	"version": "8.0",
+	"version": "9.0",
 	"authentication": "no",
 	"module": "zippy.php",
 	"class": "ZippyHost",
